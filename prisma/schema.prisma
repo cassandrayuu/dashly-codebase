@@ -1,0 +1,336 @@
+// Dashly Data Model
+// A simplified food delivery marketplace
+//
+// Key entities:
+// - User: customers, merchants, couriers, and admins
+// - Restaurant: food establishments managed by merchants
+// - MenuItem: items available at restaurants
+// - Cart/CartItem: customer's pending order before checkout
+// - Order/OrderItem: placed orders with status tracking
+// - Promotion: discount codes and their usage
+// - Refund: refund requests for order issues
+//
+// NOTE: SQLite does not support native enums. All enum fields are stored as
+// strings. Valid values are documented in comments and enforced at the
+// application layer via src/lib/enums.ts.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ============================================================================
+// USER & AUTHENTICATION
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  role      String   @default("CUSTOMER") // UserRole: CUSTOMER, MERCHANT, COURIER, ADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Customer relationships
+  addresses        Address[]
+  carts            Cart[]
+  customerOrders   Order[]          @relation("CustomerOrders")
+  promotionUsages  PromotionUsage[]
+  refundRequests   Refund[]         @relation("RefundRequester")
+
+  // Merchant relationships
+  restaurants      Restaurant[]
+
+  // Courier relationships
+  courierOrders    Order[]          @relation("CourierOrders")
+  courierLocation  CourierLocation?
+  courierStatus    String           @default("OFFLINE") // CourierStatus: OFFLINE, AVAILABLE, ON_DELIVERY
+
+  // Admin relationships
+  processedRefunds Refund[]         @relation("RefundProcessor")
+}
+
+model Address {
+  id           String  @id @default(cuid())
+  userId       String
+  label        String  // "Home", "Work", etc.
+  streetLine1  String
+  streetLine2  String?
+  city         String
+  state        String
+  zipCode      String
+  latitude     Float
+  longitude    Float
+  isDefault    Boolean @default(false)
+
+  user         User    @relation(fields: [userId], references: [id])
+  orders       Order[]
+}
+
+model CourierLocation {
+  id          String   @id @default(cuid())
+  courierId   String   @unique
+  latitude    Float
+  longitude   Float
+  lastUpdated DateTime @updatedAt
+
+  courier     User     @relation(fields: [courierId], references: [id])
+}
+
+// ============================================================================
+// RESTAURANT & MENU
+// ============================================================================
+
+model Restaurant {
+  id                  String   @id @default(cuid())
+  merchantId          String
+  name                String
+  description         String?
+  cuisine             String   // "Italian", "Mexican", "Chinese", etc.
+  streetAddress       String
+  city                String
+  state               String
+  zipCode             String
+  latitude            Float
+  longitude           Float
+  deliveryRadiusMiles Float    @default(5.0)
+  minimumOrderAmount  Float    @default(10.0)
+  deliveryFee         Float    @default(3.99)
+  estimatedPrepTime   Int      @default(25) // minutes
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  merchant            User          @relation(fields: [merchantId], references: [id])
+  openingHours        OpeningHours[]
+  menuCategories      MenuCategory[]
+  menuItems           MenuItem[]
+  carts               Cart[]
+  orders              Order[]
+}
+
+model OpeningHours {
+  id           String @id @default(cuid())
+  restaurantId String
+  dayOfWeek    Int    // 0 = Sunday, 6 = Saturday
+  openTime     String // "09:00" (24-hour format)
+  closeTime    String // "22:00"
+  isClosed     Boolean @default(false)
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([restaurantId, dayOfWeek])
+}
+
+model MenuCategory {
+  id           String @id @default(cuid())
+  restaurantId String
+  name         String
+  description  String?
+  sortOrder    Int    @default(0)
+
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  menuItems    MenuItem[]
+}
+
+model MenuItem {
+  id           String   @id @default(cuid())
+  restaurantId String
+  categoryId   String?
+  name         String
+  description  String?
+  price        Float
+  imageUrl     String?
+  isAvailable  Boolean  @default(true)
+  isPopular    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id])
+  category     MenuCategory? @relation(fields: [categoryId], references: [id])
+  cartItems    CartItem[]
+  orderItems   OrderItem[]
+}
+
+// ============================================================================
+// CART
+// ============================================================================
+
+model Cart {
+  id           String   @id @default(cuid())
+  customerId   String
+  restaurantId String
+  promoCode    String?  // Applied promo code (validated at checkout)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  customer     User       @relation(fields: [customerId], references: [id])
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id])
+  items        CartItem[]
+
+  @@unique([customerId, restaurantId])
+}
+
+model CartItem {
+  id                   String  @id @default(cuid())
+  cartId               String
+  menuItemId           String
+  quantity             Int     @default(1)
+  specialInstructions  String?
+
+  cart                 Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  menuItem             MenuItem @relation(fields: [menuItemId], references: [id])
+
+  @@unique([cartId, menuItemId])
+}
+
+// ============================================================================
+// ORDERS
+// ============================================================================
+
+model Order {
+  id                String   @id @default(cuid())
+  customerId        String
+  restaurantId      String
+  courierId         String?
+  deliveryAddressId String
+
+  // Status tracking
+  // OrderStatus: PENDING, CONFIRMED, PREPARING, READY_FOR_PICKUP, COURIER_ASSIGNED, PICKED_UP, DELIVERED, CANCELLED
+  status            String   @default("PENDING")
+
+  // Timestamps for each status transition
+  placedAt          DateTime    @default(now())
+  confirmedAt       DateTime?
+  preparingAt       DateTime?
+  readyAt           DateTime?
+  pickedUpAt        DateTime?
+  deliveredAt       DateTime?
+  cancelledAt       DateTime?
+
+  // Pricing breakdown (captured at order time)
+  subtotal          Float       // Sum of item prices
+  deliveryFee       Float
+  serviceFee        Float       // Platform fee
+  discount          Float       @default(0)
+  tip               Float       @default(0)
+  total             Float       // Final charge
+
+  // Promo tracking
+  appliedPromoCode  String?
+  appliedPromoId    String?
+
+  // Delivery info
+  deliveryInstructions String?
+  estimatedDelivery    DateTime?
+
+  // Cancellation/issue info
+  cancellationReason   String?
+
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  customer          User        @relation("CustomerOrders", fields: [customerId], references: [id])
+  restaurant        Restaurant  @relation(fields: [restaurantId], references: [id])
+  courier           User?       @relation("CourierOrders", fields: [courierId], references: [id])
+  deliveryAddress   Address     @relation(fields: [deliveryAddressId], references: [id])
+  items             OrderItem[]
+  refunds           Refund[]
+}
+
+model OrderItem {
+  id                String  @id @default(cuid())
+  orderId           String
+  menuItemId        String
+  quantity          Int
+  priceAtPurchase   Float   // Captured price at order time
+  specialInstructions String?
+
+  // Substitution handling
+  // SubstitutionStatus: NONE, UNAVAILABLE, SUBSTITUTE_OFFERED, SUBSTITUTE_ACCEPTED, SUBSTITUTE_REJECTED, REFUND_REQUESTED
+  substitutionStatus String  @default("NONE")
+  substituteItemId   String? // If substituted, the replacement item
+  substitutionNote   String? // Merchant note about substitution
+
+  order             Order   @relation(fields: [orderId], references: [id])
+  menuItem          MenuItem @relation(fields: [menuItemId], references: [id])
+}
+
+// ============================================================================
+// PROMOTIONS
+// ============================================================================
+
+model Promotion {
+  id               String   @id @default(cuid())
+  code             String   @unique
+  description      String
+  // DiscountType: FLAT_AMOUNT, PERCENTAGE, FREE_DELIVERY
+  discountType     String
+  discountValue    Float    // Dollar amount or percentage (0.15 = 15%)
+  minimumOrderAmount Float  @default(0)
+  maximumDiscount  Float?   // Cap for percentage discounts
+  usageLimit       Int?     // Total uses allowed (null = unlimited)
+  perUserLimit     Int      @default(1) // Uses per customer
+  validFrom        DateTime @default(now())
+  validUntil       DateTime?
+  isActive         Boolean  @default(true)
+
+  // Targeting (null = applies to all)
+  restaurantId     String?  // Specific restaurant only
+  firstOrderOnly   Boolean  @default(false)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  usages           PromotionUsage[]
+}
+
+model PromotionUsage {
+  id          String   @id @default(cuid())
+  promotionId String
+  customerId  String
+  orderId     String
+  usedAt      DateTime @default(now())
+
+  promotion   Promotion @relation(fields: [promotionId], references: [id])
+  customer    User      @relation(fields: [customerId], references: [id])
+
+  @@unique([promotionId, orderId])
+}
+
+// ============================================================================
+// REFUNDS & SUPPORT
+// ============================================================================
+
+model Refund {
+  id           String    @id @default(cuid())
+  orderId      String
+  requesterId  String    // Customer who requested
+  processedById String?  // Admin who processed
+
+  // RefundReason: WRONG_ITEMS, MISSING_ITEMS, QUALITY_ISSUE, NEVER_DELIVERED, EXCESSIVE_DELAY, OTHER
+  reason       String
+  reasonDetail String?   // Additional explanation
+
+  // What's being refunded
+  // RefundType: FULL, PARTIAL, DELIVERY_FEE
+  refundType   String
+  amount       Float     // Amount to refund
+  itemIds      String?   // Comma-separated OrderItem IDs (for partial)
+
+  // RefundStatus: PENDING, APPROVED, DENIED, PROCESSED
+  status       String    @default("PENDING")
+  adminNote    String?   // Internal note from admin
+
+  requestedAt  DateTime  @default(now())
+  resolvedAt   DateTime?
+
+  order        Order     @relation(fields: [orderId], references: [id])
+  requester    User      @relation("RefundRequester", fields: [requesterId], references: [id])
+  processedBy  User?     @relation("RefundProcessor", fields: [processedById], references: [id])
+}
