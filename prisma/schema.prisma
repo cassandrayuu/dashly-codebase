@@ -9,6 +9,8 @@
 // - Order/OrderItem: placed orders with status tracking
 // - Promotion: discount codes and their usage
 // - Refund: refund requests for order issues
+// - Subscription: Dashly Plus membership (FEATURE: dashly_plus_retention)
+// - Review: customer ratings after delivery (FEATURE: merchant_menu_accuracy)
 //
 // NOTE: SQLite does not support native enums. All enum fields are stored as
 // strings. Valid values are documented in comments and enforced at the
@@ -36,12 +38,18 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Market for geographic segmentation (sf, phx, mia, aus)
+  // Used for market-specific analysis (e.g., Phoenix menu issues, Miami dasher supply)
+  market    String   @default("sf")
+
   // Customer relationships
   addresses        Address[]
   carts            Cart[]
   customerOrders   Order[]          @relation("CustomerOrders")
   promotionUsages  PromotionUsage[]
   refundRequests   Refund[]         @relation("RefundRequester")
+  subscription     Subscription?
+  reviews          Review[]
 
   // Merchant relationships
   restaurants      Restaurant[]
@@ -106,12 +114,22 @@ model Restaurant {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
+  // Market for geographic segmentation
+  // FEATURE: merchant_menu_accuracy - Phoenix has 3% cancellation rate
+  market              String   @default("sf")
+
+  // Rating aggregates (updated after each review)
+  // FEATURE: merchant_menu_accuracy, search_relevance
+  avgRating           Float?   // Average of all review ratings (1-5)
+  reviewCount         Int      @default(0)
+
   merchant            User          @relation(fields: [merchantId], references: [id])
   openingHours        OpeningHours[]
   menuCategories      MenuCategory[]
   menuItems           MenuItem[]
   carts               Cart[]
   orders              Order[]
+  reviews             Review[]
 }
 
 model OpeningHours {
@@ -241,6 +259,7 @@ model Order {
   deliveryAddress   Address     @relation(fields: [deliveryAddressId], references: [id])
   items             OrderItem[]
   refunds           Refund[]
+  review            Review?
 }
 
 model OrderItem {
@@ -333,4 +352,92 @@ model Refund {
   order        Order     @relation(fields: [orderId], references: [id])
   requester    User      @relation("RefundRequester", fields: [requesterId], references: [id])
   processedBy  User?     @relation("RefundProcessor", fields: [processedById], references: [id])
+}
+
+// ============================================================================
+// SUBSCRIPTIONS (Dashly Plus)
+// ============================================================================
+//
+// FEATURE: dashly_plus_retention
+// ADR: docs/adr/005-boolean-plus-membership.md
+//
+// Dashly Plus is a subscription program offering:
+// - Free delivery on all orders
+// - Exclusive promotions
+// - Priority support
+//
+// Current implementation is basic - just status tracking.
+// Future enhancements: Stripe integration, pause/resume, usage analytics
+
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+
+  // SubscriptionStatus: TRIAL, ACTIVE, PAUSED, CANCELLED, EXPIRED
+  status        String   @default("ACTIVE")
+
+  // Plan: MONTHLY, ANNUAL
+  plan          String   @default("MONTHLY")
+
+  // Pricing
+  monthlyPrice  Float    @default(9.99)
+
+  // Dates
+  startedAt     DateTime @default(now())
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime
+  trialEndsAt   DateTime?
+  cancelledAt   DateTime?
+  pausedAt      DateTime?
+
+  // Cancel tracking (for churn analysis)
+  // CancelReason: TOO_EXPENSIVE, NOT_ENOUGH_VALUE, SWITCHING_COMPETITOR, TEMPORARY_PAUSE, OTHER
+  cancelReason  String?
+
+  // Stripe integration placeholder
+  stripeSubscriptionId String?
+  stripeCustomerId     String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+// ============================================================================
+// REVIEWS & RATINGS
+// ============================================================================
+//
+// FEATURE: merchant_menu_accuracy, dasher_offer_quality
+//
+// After delivery, customers can rate their experience.
+// Ratings affect restaurant ranking and courier performance.
+//
+// Current implementation is basic - just captures ratings.
+// Future: photo uploads, merchant responses, rating breakdown by category
+
+model Review {
+  id              String   @id @default(cuid())
+  orderId         String   @unique
+  customerId      String
+  restaurantId    String
+
+  // Ratings (1-5 stars)
+  overallRating   Int      // Overall experience
+  foodRating      Int?     // Food quality
+  deliveryRating  Int?     // Delivery experience (speed, courier)
+
+  // Review text
+  comment         String?
+
+  // Issue tracking (for support_resolution_speed correlation)
+  hadIssue        Boolean  @default(false)
+  issueType       String?  // LATE_DELIVERY, WRONG_ITEMS, MISSING_ITEMS, QUALITY, OTHER
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order           Order      @relation(fields: [orderId], references: [id])
+  customer        User       @relation(fields: [customerId], references: [id])
+  restaurant      Restaurant @relation(fields: [restaurantId], references: [id])
 }

@@ -102,6 +102,59 @@ export enum RefundStatus {
 }
 
 // ============================================================================
+// SUBSCRIPTION ENUMS (Dashly Plus)
+// ============================================================================
+// FEATURE: dashly_plus_retention
+// ADR: docs/adr/005-boolean-plus-membership.md
+
+export enum SubscriptionStatus {
+  TRIAL = 'TRIAL',
+  ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum SubscriptionPlan {
+  MONTHLY = 'MONTHLY',
+  ANNUAL = 'ANNUAL',
+}
+
+export enum CancelReason {
+  TOO_EXPENSIVE = 'TOO_EXPENSIVE',
+  NOT_ENOUGH_VALUE = 'NOT_ENOUGH_VALUE',
+  SWITCHING_COMPETITOR = 'SWITCHING_COMPETITOR',
+  TEMPORARY_PAUSE = 'TEMPORARY_PAUSE',
+  OTHER = 'OTHER',
+}
+
+// ============================================================================
+// MARKET ENUMS
+// ============================================================================
+// Used for geographic segmentation and market-specific analysis
+// FEATURE: merchant_menu_accuracy (Phoenix), dasher_offer_quality (Miami)
+
+export enum Market {
+  SF = 'sf',       // San Francisco - mature, healthy baseline
+  AUS = 'aus',     // Austin - growing market
+  PHX = 'phx',     // Phoenix - struggling, menu accuracy issues
+  MIA = 'mia',     // Miami - struggling, dasher supply issues
+}
+
+// ============================================================================
+// REVIEW ENUMS
+// ============================================================================
+// FEATURE: merchant_menu_accuracy, dasher_offer_quality
+
+export enum ReviewIssueType {
+  LATE_DELIVERY = 'LATE_DELIVERY',
+  WRONG_ITEMS = 'WRONG_ITEMS',
+  MISSING_ITEMS = 'MISSING_ITEMS',
+  QUALITY = 'QUALITY',
+  OTHER = 'OTHER',
+}
+
+// ============================================================================
 // TYPE GUARDS
 // ============================================================================
 
@@ -127,4 +180,12 @@ export function isValidRefundReason(value: string): value is RefundReason {
 
 export function isValidRefundStatus(value: string): value is RefundStatus {
   return Object.values(RefundStatus).includes(value as RefundStatus)
+}
+
+export function isValidSubscriptionStatus(value: string): value is SubscriptionStatus {
+  return Object.values(SubscriptionStatus).includes(value as SubscriptionStatus)
+}
+
+export function isValidMarket(value: string): value is Market {
+  return Object.values(Market).includes(value as Market)
 }
