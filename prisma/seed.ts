@@ -229,7 +229,9 @@ async function main() {
     },
   })
 
-  // Cancelled subscriber (for churn analysis)
+  // Cancelled subscriber - Miami customer, cancelled due to delivery issues
+  // FEATURE: dashly_plus_retention + delivery_tracking_accuracy overlap
+  // Shows that poor delivery experience drives Plus churn
   await prisma.subscription.create({
     data: {
       userId: customer5.id,
@@ -240,11 +242,26 @@ async function main() {
       currentPeriodStart: new Date('2024-12-01'),
       currentPeriodEnd: new Date('2025-01-01'),
       cancelledAt: new Date('2024-12-20'),
-      cancelReason: 'NOT_ENOUGH_VALUE',
+      cancelReason: 'NOT_ENOUGH_VALUE', // Delivery issues made Plus feel not worth it
     },
   })
 
-  console.log('✓ Created Dashly Plus subscriptions (1 active, 1 trial, 1 cancelled)')
+  // Paused subscriber - Phoenix customer, paused due to repeated cancellations
+  // FEATURE: dashly_plus_retention + merchant_menu_accuracy overlap
+  await prisma.subscription.create({
+    data: {
+      userId: customer4.id,
+      status: SubscriptionStatus.PAUSED,
+      plan: SubscriptionPlan.MONTHLY,
+      monthlyPrice: 9.99,
+      startedAt: new Date('2024-11-01'),
+      currentPeriodStart: new Date('2025-01-01'),
+      currentPeriodEnd: new Date('2025-02-01'),
+      pausedAt: new Date('2025-01-14'), // Paused after menu issues
+    },
+  })
+
+  console.log('✓ Created Dashly Plus subscriptions (1 active, 1 trial, 1 paused, 1 cancelled)')
 
   // ============================================================================
   // CUSTOMER ADDRESSES
@@ -1091,7 +1108,319 @@ async function main() {
     },
   })
 
-  console.log('✓ Created sample orders')
+  // ============================================================================
+  // ADDITIONAL ORDERS FOR DEMO SCENARIOS
+  // ============================================================================
+
+  // ----------------------------------------------------------------------------
+  // SCENARIO 1: Checkout Abandonment Data
+  // Shows patterns of: payment timeouts, re-entry friction, slow checkout
+  // FEATURE: checkout_conversion
+  // ----------------------------------------------------------------------------
+
+  // Order 6: SF customer with promo code - successful (shows value of saved payment)
+  const order6 = await prisma.order.create({
+    data: {
+      customerId: customer1.id,
+      restaurantId: tacoTiempo.id,
+      courierId: courier1.id,
+      deliveryAddressId: address1.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-10T19:15:00'),
+      confirmedAt: new Date('2025-01-10T19:17:00'),
+      preparingAt: new Date('2025-01-10T19:20:00'),
+      readyAt: new Date('2025-01-10T19:35:00'),
+      pickedUpAt: new Date('2025-01-10T19:38:00'),
+      deliveredAt: new Date('2025-01-10T19:52:00'),
+      subtotal: 27.97,
+      deliveryFee: 2.99,
+      serviceFee: 1.40,
+      discount: 10.00,
+      tip: 4.00,
+      total: 26.36,
+      appliedPromoCode: 'WELCOME10',
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order6.id,
+      menuItemId: margheritaPizza.id,
+      quantity: 1,
+      priceAtPurchase: 16.99,
+    },
+  })
+
+  // Order 7: Power user rapid reorder (shows value of express checkout)
+  const order7 = await prisma.order.create({
+    data: {
+      customerId: customer2.id,
+      restaurantId: dragonPalace.id,
+      courierId: courier2.id,
+      deliveryAddressId: address2.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-11T20:00:00'),
+      confirmedAt: new Date('2025-01-11T20:01:00'),
+      preparingAt: new Date('2025-01-11T20:05:00'),
+      readyAt: new Date('2025-01-11T20:30:00'),
+      pickedUpAt: new Date('2025-01-11T20:35:00'),
+      deliveredAt: new Date('2025-01-11T20:50:00'),
+      subtotal: 33.98,
+      deliveryFee: 0, // Plus member
+      serviceFee: 1.70,
+      discount: 0,
+      tip: 5.00,
+      total: 40.68,
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order7.id,
+      menuItemId: spaghettiCarbonara.id,
+      quantity: 1,
+      priceAtPurchase: 18.99,
+    },
+  })
+
+  // ----------------------------------------------------------------------------
+  // SCENARIO 2: Phoenix Menu Accuracy Issues
+  // Shows: cancelled orders, item unavailability, substitution problems
+  // FEATURE: merchant_menu_accuracy
+  // ----------------------------------------------------------------------------
+
+  // Order 8: Phoenix - another cancellation due to menu accuracy
+  const order8 = await prisma.order.create({
+    data: {
+      customerId: customer4.id,
+      restaurantId: phoenixGrill.id,
+      deliveryAddressId: address4.id,
+      status: OrderStatus.CANCELLED,
+      placedAt: new Date('2025-01-08T18:00:00'),
+      confirmedAt: new Date('2025-01-08T18:03:00'),
+      cancelledAt: new Date('2025-01-08T18:15:00'),
+      cancellationReason: 'Multiple items unavailable - merchant cancelled',
+      subtotal: 32.97,
+      deliveryFee: 3.99,
+      serviceFee: 1.65,
+      discount: 0,
+      tip: 0,
+      total: 38.61,
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order8.id,
+      menuItemId: southwestSalad.id,
+      quantity: 2,
+      priceAtPurchase: 12.99,
+      substitutionStatus: 'UNAVAILABLE',
+    },
+  })
+
+  // Order 9: Phoenix - successful but with substitution
+  const order9 = await prisma.order.create({
+    data: {
+      customerId: customer4.id,
+      restaurantId: phoenixGrill.id,
+      courierId: courier1.id,
+      deliveryAddressId: address4.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-06T12:30:00'),
+      confirmedAt: new Date('2025-01-06T12:35:00'),
+      preparingAt: new Date('2025-01-06T12:40:00'),
+      readyAt: new Date('2025-01-06T13:05:00'),
+      pickedUpAt: new Date('2025-01-06T13:10:00'),
+      deliveredAt: new Date('2025-01-06T13:30:00'),
+      subtotal: 12.99,
+      deliveryFee: 3.99,
+      serviceFee: 0.65,
+      discount: 0,
+      tip: 2.00,
+      total: 19.63,
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order9.id,
+      menuItemId: southwestSalad.id,
+      quantity: 1,
+      priceAtPurchase: 12.99,
+      substitutionStatus: 'SUBSTITUTE_ACCEPTED', // Customer accepted substitute
+    },
+  })
+
+  // Order 10: Phoenix - third cancellation (shows pattern)
+  const order10 = await prisma.order.create({
+    data: {
+      customerId: customer4.id,
+      restaurantId: phoenixGrill.id,
+      deliveryAddressId: address4.id,
+      status: OrderStatus.CANCELLED,
+      placedAt: new Date('2025-01-03T19:00:00'),
+      confirmedAt: new Date('2025-01-03T19:02:00'),
+      cancelledAt: new Date('2025-01-03T19:12:00'),
+      cancellationReason: 'Item unavailable - no substitute offered',
+      subtotal: 9.99,
+      deliveryFee: 3.99,
+      serviceFee: 0.50,
+      discount: 0,
+      tip: 0,
+      total: 14.48,
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order10.id,
+      menuItemId: southwestSalad.id,
+      quantity: 1,
+      priceAtPurchase: 12.99,
+      substitutionStatus: 'UNAVAILABLE',
+    },
+  })
+
+  // ----------------------------------------------------------------------------
+  // SCENARIO 3: Delivery ETA Accuracy Issues
+  // Shows: late deliveries, ETA variance, static predictions
+  // FEATURE: delivery_tracking_accuracy
+  // ----------------------------------------------------------------------------
+
+  // Order 11: Miami - severely late delivery (35 min over ETA)
+  const order11 = await prisma.order.create({
+    data: {
+      customerId: customer5.id,
+      restaurantId: cubanCafe.id,
+      courierId: courier3.id,
+      deliveryAddressId: address5.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-09T13:00:00'),
+      confirmedAt: new Date('2025-01-09T13:03:00'),
+      preparingAt: new Date('2025-01-09T13:08:00'),
+      readyAt: new Date('2025-01-09T13:25:00'),
+      pickedUpAt: new Date('2025-01-09T13:50:00'), // 25 min delay getting dasher
+      deliveredAt: new Date('2025-01-09T14:20:00'), // 35 min over estimate
+      subtotal: 18.99,
+      deliveryFee: 4.99,
+      serviceFee: 0.95,
+      discount: 0,
+      tip: 0, // No tip due to late delivery
+      total: 24.93,
+      estimatedDelivery: new Date('2025-01-09T13:45:00'),
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order11.id,
+      menuItemId: cubanSandwich.id,
+      quantity: 1,
+      priceAtPurchase: 18.99,
+    },
+  })
+
+  // Order 12: SF - on-time delivery (shows market difference)
+  const order12 = await prisma.order.create({
+    data: {
+      customerId: customer1.id,
+      restaurantId: bellaRoma.id,
+      courierId: courier1.id,
+      deliveryAddressId: address1.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-08T18:30:00'),
+      confirmedAt: new Date('2025-01-08T18:32:00'),
+      preparingAt: new Date('2025-01-08T18:35:00'),
+      readyAt: new Date('2025-01-08T18:55:00'),
+      pickedUpAt: new Date('2025-01-08T18:58:00'),
+      deliveredAt: new Date('2025-01-08T19:12:00'), // 2 min early
+      subtotal: 25.98,
+      deliveryFee: 3.99,
+      serviceFee: 1.30,
+      discount: 0,
+      tip: 5.00,
+      total: 36.27,
+      estimatedDelivery: new Date('2025-01-08T19:15:00'),
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order12.id,
+      menuItemId: margheritaPizza.id,
+      quantity: 1,
+      priceAtPurchase: 16.99,
+    },
+  })
+
+  // Order 13: Miami - moderate delay (15 min over)
+  const order13 = await prisma.order.create({
+    data: {
+      customerId: customer5.id,
+      restaurantId: cubanCafe.id,
+      courierId: courier3.id,
+      deliveryAddressId: address5.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-05T19:00:00'),
+      confirmedAt: new Date('2025-01-05T19:02:00'),
+      preparingAt: new Date('2025-01-05T19:05:00'),
+      readyAt: new Date('2025-01-05T19:25:00'),
+      pickedUpAt: new Date('2025-01-05T19:40:00'), // 15 min wait for dasher
+      deliveredAt: new Date('2025-01-05T20:00:00'), // 15 min over estimate
+      subtotal: 14.99,
+      deliveryFee: 4.99,
+      serviceFee: 0.75,
+      discount: 0,
+      tip: 2.00,
+      total: 22.73,
+      estimatedDelivery: new Date('2025-01-05T19:45:00'),
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order13.id,
+      menuItemId: cubanSandwich.id,
+      quantity: 1,
+      priceAtPurchase: 14.99,
+    },
+  })
+
+  // Order 14: SF - early delivery (contrasts with Miami)
+  const order14 = await prisma.order.create({
+    data: {
+      customerId: customer2.id,
+      restaurantId: tacoTiempo.id,
+      courierId: courier1.id,
+      deliveryAddressId: address2.id,
+      status: OrderStatus.DELIVERED,
+      placedAt: new Date('2025-01-04T12:00:00'),
+      confirmedAt: new Date('2025-01-04T12:01:00'),
+      preparingAt: new Date('2025-01-04T12:05:00'),
+      readyAt: new Date('2025-01-04T12:20:00'),
+      pickedUpAt: new Date('2025-01-04T12:22:00'),
+      deliveredAt: new Date('2025-01-04T12:32:00'), // 8 min early
+      subtotal: 17.97,
+      deliveryFee: 0, // Plus member
+      serviceFee: 0.90,
+      discount: 0,
+      tip: 4.00,
+      total: 22.87,
+      estimatedDelivery: new Date('2025-01-04T12:40:00'),
+    },
+  })
+
+  await prisma.orderItem.create({
+    data: {
+      orderId: order14.id,
+      menuItemId: bruschetta.id,
+      quantity: 1,
+      priceAtPurchase: 9.99,
+    },
+  })
+
+  console.log('✓ Created sample orders (14 total, supporting all 3 demo scenarios)')
 
   // ============================================================================
   // REVIEWS
@@ -1141,7 +1470,95 @@ async function main() {
     },
   })
 
-  console.log('✓ Created reviews')
+  // ----------------------------------------------------------------------------
+  // ADDITIONAL REVIEWS FOR DEMO SCENARIOS
+  // ----------------------------------------------------------------------------
+
+  // Scenario 2: Phoenix menu accuracy issues
+  await prisma.review.create({
+    data: {
+      orderId: order9.id,
+      customerId: customer4.id,
+      restaurantId: phoenixGrill.id,
+      overallRating: 3,
+      foodRating: 4,
+      deliveryRating: 3,
+      comment: 'My original order item was unavailable. They offered a substitute but it wasn\'t what I wanted. This happens a lot at this restaurant.',
+      hadIssue: true,
+      issueType: 'WRONG_ITEMS',
+    },
+  })
+
+  // Scenario 3: More Miami ETA issues
+  await prisma.review.create({
+    data: {
+      orderId: order11.id,
+      customerId: customer5.id,
+      restaurantId: cubanCafe.id,
+      overallRating: 2,
+      foodRating: 3,
+      deliveryRating: 1,
+      comment: 'Order was 35 minutes late! The ETA never updated even though I could see the dasher was delayed. Food arrived cold. Very frustrating.',
+      hadIssue: true,
+      issueType: 'LATE_DELIVERY',
+    },
+  })
+
+  await prisma.review.create({
+    data: {
+      orderId: order13.id,
+      customerId: customer5.id,
+      restaurantId: cubanCafe.id,
+      overallRating: 3,
+      foodRating: 4,
+      deliveryRating: 2,
+      comment: 'Food quality is great but the delivery times in this area are consistently late. Wish the app would give more accurate estimates.',
+      hadIssue: true,
+      issueType: 'LATE_DELIVERY',
+    },
+  })
+
+  // SF contrast reviews - on-time deliveries
+  await prisma.review.create({
+    data: {
+      orderId: order6.id,
+      customerId: customer1.id,
+      restaurantId: tacoTiempo.id,
+      overallRating: 5,
+      foodRating: 5,
+      deliveryRating: 5,
+      comment: 'Always reliable! Food arrived exactly when expected and still hot.',
+      hadIssue: false,
+    },
+  })
+
+  await prisma.review.create({
+    data: {
+      orderId: order12.id,
+      customerId: customer1.id,
+      restaurantId: bellaRoma.id,
+      overallRating: 5,
+      foodRating: 5,
+      deliveryRating: 5,
+      comment: 'Delivery was actually 2 minutes early! Love the consistency in SF.',
+      hadIssue: false,
+    },
+  })
+
+  await prisma.review.create({
+    data: {
+      orderId: order14.id,
+      customerId: customer2.id,
+      restaurantId: tacoTiempo.id,
+      overallRating: 5,
+      foodRating: 5,
+      deliveryRating: 5,
+      comment: 'Super fast delivery, arrived 8 minutes before estimated. Plus membership is worth it!',
+      hadIssue: false,
+    },
+  })
+
+  console.log('✓ Created reviews (9 total, supporting demo scenarios)')
 
   // ============================================================================
   // SAMPLE CART
