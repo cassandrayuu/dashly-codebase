@@ -6,6 +6,21 @@
  * - Menu management
  * - Item availability
  * - Substitution offers
+ *
+ * AMPLITUDE FEATURE KEY: merchant_menu_accuracy
+ *
+ * KEY CONSTRAINTS (for Spark to discover):
+ * - ADR-003: Menu sync is pull-based with 4-hour refresh cycle
+ * - Phoenix market has 3% cancellation rate due to stale availability data
+ * - markItemUnavailable() is reactive (after order placed), not proactive
+ *
+ * METRICS:
+ * - order_cancellation_rate: Phoenix 3.0% vs SF 2.3%
+ * - menu_accuracy_score: Phoenix 87% vs SF 94%
+ * - substitution_rate: Phoenix 8% vs SF 4%
+ *
+ * SEE: docs/analytics/instrumentation-map.md
+ * SEE: docs/adr/003-pull-based-menu-sync.md
  */
 
 import { prisma } from '@/lib/db'
@@ -201,6 +216,14 @@ export class MerchantService {
 
   /**
    * Mark an order item as unavailable and optionally offer substitute.
+   *
+   * FEATURE: merchant_menu_accuracy
+   * CONSTRAINT: This is a REACTIVE flow - merchant discovers stockout after order placed
+   * ADR: docs/adr/003-pull-based-menu-sync.md
+   * AMPLITUDE EVENT: Merchant - Marked - Item Unavailable
+   *
+   * Phoenix market impact: This reactive flow contributes to 3% cancellation rate.
+   * With real-time POS sync, items would be marked unavailable BEFORE ordering.
    *
    * LIMITATION_SUBSTITUTION_INTELLIGENCE: Current implementation only supports
    * a single substitute option chosen manually by the merchant. See

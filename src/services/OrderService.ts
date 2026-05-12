@@ -9,6 +9,18 @@
  *
  * This service coordinates between cart, promotion, and order domain logic.
  *
+ * AMPLITUDE FEATURE KEYS:
+ * - checkout_conversion: placeOrder() is the checkout completion path
+ * - delivery_tracking_accuracy: estimatedDelivery calculation in placeOrder()
+ *
+ * KEY CONSTRAINTS (for Spark to discover):
+ * - ADR-001: Payment is synchronous, blocking checkout (4.2% failure rate)
+ * - ADR-002: ETA is static, calculated once at order placement (±12 min accuracy)
+ *
+ * SEE: docs/analytics/instrumentation-map.md
+ * SEE: docs/adr/001-synchronous-payment-flow.md
+ * SEE: docs/adr/002-static-eta-calculation.md
+ *
  * LIMITATION_ORDER_EDITING: Orders are currently immutable after placement.
  * This service has no edit/modify methods—only cancel. See
  * docs/known-limitations.md for enhancement opportunities including:
@@ -92,6 +104,11 @@ export class OrderService {
     })
 
     // Calculate estimated delivery time
+    // FEATURE: delivery_tracking_accuracy
+    // CONSTRAINT: ETA is static - calculated once here, never updated during delivery
+    // ADR: docs/adr/002-static-eta-calculation.md
+    // METRIC: eta_accuracy_minutes (current: ±12 min, target: ±6 min with ML model)
+    //
     // LIMITATION_COURIER_BATCHING: ETA is currently static (prep time + 15 min buffer).
     // Does not account for: courier distance, traffic, historical delivery times.
     // See docs/known-limitations.md for ETA enhancement opportunities.

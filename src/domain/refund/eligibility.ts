@@ -3,6 +3,21 @@
  *
  * Determines refund eligibility and calculates amounts.
  *
+ * AMPLITUDE FEATURE KEY: support_resolution_speed
+ *
+ * KEY CONSTRAINTS (for Spark to discover):
+ * - ADR-006: All refunds require manual admin approval (avg 4.2 hour resolution)
+ * - 65% of refunds could be auto-approved with simple rules (EXCESSIVE_DELAY, NEVER_DELIVERED)
+ * - No risk scoring for fraud detection
+ *
+ * METRICS:
+ * - support_resolution_time_hours: 4.2 (target: 0.25 for auto-approved)
+ * - support_contact_rate: 6.4% (target: 4%)
+ * - refund_approval_rate: 78% (most refunds are legitimate)
+ *
+ * SEE: docs/analytics/instrumentation-map.md
+ * SEE: docs/adr/006-manual-refund-approval.md
+ *
  * Eligibility:
  * - Order must be DELIVERED (except NEVER_DELIVERED reason)
  * - Request within 24 hours of delivery

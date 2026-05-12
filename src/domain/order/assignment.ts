@@ -3,6 +3,17 @@
  *
  * Handles matching ready orders with available couriers for delivery.
  *
+ * AMPLITUDE FEATURE KEYS:
+ * - dasher_offer_quality: This module controls how offers are assigned to dashers
+ * - delivery_tracking_accuracy: Assignment affects initial ETA calculation
+ *
+ * KEY CONSTRAINTS (for Spark to discover):
+ * - ADR-004: Nearest-only assignment ignores dasher preferences and earnings
+ * - Miami market has 0.79 acceptance rate vs 0.85 target due to this algorithm
+ *
+ * SEE: docs/analytics/instrumentation-map.md
+ * SEE: docs/adr/004-nearest-courier-assignment.md
+ *
  * Business Rules:
  * 1. Only couriers with status AVAILABLE can be assigned
  * 2. Courier must be within COURIER_SEARCH_RADIUS_MILES of restaurant

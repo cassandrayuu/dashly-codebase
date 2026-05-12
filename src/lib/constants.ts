@@ -2,6 +2,17 @@
  * Application Constants
  *
  * Configurable business rule values. Changing these affects platform behavior.
+ *
+ * AMPLITUDE FEATURE KEYS MAPPED IN THIS FILE:
+ * - checkout_conversion: SERVICE_FEE_*, FEATURE_FLAGS.ORDER_EDITING
+ * - delivery_tracking_accuracy: COURIER_SEARCH_RADIUS_MILES, FEATURE_FLAGS.LIVE_TRACKING
+ * - dashly_plus_retention: (User.is_plus_member in schema, no constants yet)
+ * - dasher_offer_quality: COURIER_SEARCH_RADIUS_MILES, FEATURE_FLAGS.COURIER_BATCHING
+ * - support_resolution_speed: REFUND_ELIGIBILITY_HOURS, FEATURE_FLAGS.AUTO_REFUNDS
+ * - promo_redemption: MAX_PROMOS_PER_ORDER, FEATURE_FLAGS.PROMO_STACKING
+ *
+ * SEE: docs/analytics/instrumentation-map.md for full event mapping
+ * SEE: docs/adr/ for technical constraint documentation
  */
 
 // ============================================================================
@@ -54,6 +65,11 @@ export const MAX_DELIVERY_DISTANCE_MILES = 10
  *
  * Current: 5 miles
  * Used by: findBestAvailableCourier() in domain/order/assignment.ts
+ *
+ * FEATURE: dasher_offer_quality, delivery_tracking_accuracy
+ * CONSTRAINT: Static radius doesn't adapt to demand/supply conditions
+ * ADR: docs/adr/004-nearest-courier-assignment.md
+ * METRIC: dasher_acceptance_rate (Miami: 0.79, target: 0.85)
  */
 export const COURIER_SEARCH_RADIUS_MILES = 5
 
@@ -66,6 +82,10 @@ export const COURIER_SEARCH_RADIUS_MILES = 5
  *
  * Current: 24 hours
  * Used by: checkRefundEligibility() in domain/refund/eligibility.ts
+ *
+ * FEATURE: support_resolution_speed
+ * ADR: docs/adr/006-manual-refund-approval.md
+ * METRIC: support_resolution_time_hours (current: 4.2, target: 0.25 for auto-approved)
  */
 export const REFUND_ELIGIBILITY_HOURS = 24
 
@@ -86,6 +106,11 @@ export const FREE_CANCELLATION_MINUTES = 5
  * Maximum number of promo codes that can be applied to a single order.
  *
  * Current: 1 (no promo stacking)
+ *
+ * FEATURE: promo_redemption, checkout_conversion
+ * CONSTRAINT: Single promo per order may reduce checkout conversion
+ * ADR: (no dedicated ADR, documented in known-limitations.md)
+ * METRIC: promo_redemption_rate, cart_abandonment_rate
  *
  * CURRENT LIMITATION: Promo stacking not supported.
  * See LIMITATION_PROMO_STACKING in domain/promotion/eligibility.ts
@@ -147,14 +172,34 @@ export const ORDER_STATUS_TRANSITIONS: Record<string, string[]> = {
 
 /**
  * Feature flags for v2+ enhancements.
+ *
+ * Each flag maps to one or more Amplitude feature keys:
+ * - SCHEDULED_DELIVERY → delivery_tracking_accuracy
+ * - COURIER_BATCHING → dasher_offer_quality, delivery_tracking_accuracy
+ * - PROMO_STACKING → promo_redemption, checkout_conversion
+ * - ORDER_EDITING → checkout_conversion
+ * - CATEGORY_PAUSE → merchant_menu_accuracy
+ * - AUTO_REFUNDS → support_resolution_speed
+ * - LIVE_TRACKING → delivery_tracking_accuracy
+ * - RATINGS_REVIEWS → merchant_menu_accuracy, dasher_offer_quality
+ *
+ * SEE: docs/analytics/instrumentation-map.md
  */
 export const FEATURE_FLAGS = {
+  /** FEATURE: delivery_tracking_accuracy */
   SCHEDULED_DELIVERY: false,
+  /** FEATURE: dasher_offer_quality - ADR: docs/adr/004-nearest-courier-assignment.md */
   COURIER_BATCHING: false,
+  /** FEATURE: promo_redemption */
   PROMO_STACKING: false,
+  /** FEATURE: checkout_conversion - ADR: docs/adr/001-synchronous-payment-flow.md */
   ORDER_EDITING: false,
+  /** FEATURE: merchant_menu_accuracy - ADR: docs/adr/003-pull-based-menu-sync.md */
   CATEGORY_PAUSE: false,
+  /** FEATURE: support_resolution_speed - ADR: docs/adr/006-manual-refund-approval.md */
   AUTO_REFUNDS: false,
+  /** FEATURE: delivery_tracking_accuracy - ADR: docs/adr/002-static-eta-calculation.md */
   LIVE_TRACKING: false,
+  /** FEATURE: merchant_menu_accuracy, dasher_offer_quality */
   RATINGS_REVIEWS: false,
 }
