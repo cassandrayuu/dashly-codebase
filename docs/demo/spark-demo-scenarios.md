@@ -482,3 +482,168 @@ After Spark generates the spec, Claude Code could:
 | **Solution Theme** | Async processing | Real-time webhooks | ML + live tracking |
 | **Complexity** | Medium | Medium-High | High |
 | **Dependencies** | Stripe, job queue | POS integrations | Maps API, WebSockets, ML |
+
+---
+
+## Optimal Test Questions for Spark
+
+### Primary Demo Questions (Start Here)
+
+These questions are designed to showcase Spark's cross-system reasoning:
+
+| # | Question | Tests | Expected Flow |
+|---|----------|-------|---------------|
+| 1 | "Our checkout abandonment rate is 42%. What's causing it and what should we build?" | Feedback→Analytics→Code→Spec | Productboard themes → Amplitude funnel → ADR-001 → PRD |
+| 2 | "Phoenix market has 30% higher cancellation rate than SF. Why?" | Market segmentation + root cause | Filter by market → Phoenix orders → Menu sync ADR-003 |
+| 3 | "Why are customers complaining about delivery times? Our ETA shows ±12 min variance." | Customer voice + technical constraint | Support tickets → ETA formula → ADR-002 → Live tracking spec |
+
+### Follow-up Questions (Drill Deeper)
+
+After the primary question, use these to test Spark's depth:
+
+**Scenario 1 Follow-ups:**
+- "What would the technical implementation look like for async payments?"
+- "How does this connect to our Dashly Plus retention problem?"
+- "Show me the specific code that's causing the timeout issue."
+
+**Scenario 2 Follow-ups:**
+- "Which Phoenix merchants have the worst menu accuracy?"
+- "How would real-time POS webhooks work with our current architecture?"
+- "What's the cost-benefit of fixing this vs just accepting some cancellations?"
+
+**Scenario 3 Follow-ups:**
+- "Compare delivery performance between SF and Miami markets."
+- "What would it take to add live courier tracking?"
+- "How does late delivery correlate with Plus subscription cancellations?"
+
+### Cross-Scenario Questions (Advanced)
+
+These test Spark's ability to connect multiple problem areas:
+
+| Question | Expected Connection |
+|----------|---------------------|
+| "What's driving Plus membership churn?" | Links delivery issues (Miami) + menu issues (Phoenix) → subscription cancellations |
+| "Which market needs the most investment?" | Compare SF (healthy) vs Phoenix (menu) vs Miami (delivery) |
+| "If we could only fix one thing, what has the highest ROI?" | Synthesize checkout + menu + delivery impact |
+| "How do our technical constraints compound customer frustration?" | Payment timeout + stale menu + bad ETA = trust erosion |
+
+### Edge Case Questions (Stress Test)
+
+Use sparingly to test Spark's limits:
+
+- "Why is our NPS score dropping?" (requires inference from multiple signals)
+- "Predict what happens if we don't fix the Phoenix menu issue in 6 months."
+- "What's the relationship between courier acceptance rate and ETA accuracy?"
+
+---
+
+## Testing Flow Checklist
+
+### Happy Path Demo (5 minutes)
+
+1. [ ] Ask primary question #1 (checkout abandonment)
+2. [ ] Observe Spark finding Productboard feedback
+3. [ ] Observe Spark pulling Amplitude metrics
+4. [ ] Observe Spark discovering ADR-001 in codebase
+5. [ ] Review generated PRD spec
+6. [ ] (Optional) Ask one follow-up
+
+### Comprehensive Demo (15 minutes)
+
+1. [ ] **Scenario 1: Checkout** (5 min)
+   - Ask: "Our checkout abandonment rate is 42%..."
+   - Follow-up: "Show me the specific code causing this."
+
+2. [ ] **Scenario 2: Phoenix Menu** (5 min)
+   - Ask: "Phoenix has 30% higher cancellation rate..."
+   - Follow-up: "How would webhooks work with our architecture?"
+
+3. [ ] **Scenario 3: ETA Accuracy** (5 min)
+   - Ask: "Customers are complaining about delivery times..."
+   - Follow-up: "Compare SF vs Miami delivery performance."
+
+### Cross-System Demo (20 minutes)
+
+All of the above, plus:
+
+4. [ ] **Cross-Scenario Question** (5 min)
+   - Ask: "What's driving Plus membership churn?"
+   - Observe Spark connecting delivery + menu → subscription data
+   - Observe Spark finding Miami cancelled subscription with "NOT_ENOUGH_VALUE"
+   - Observe Spark finding Phoenix paused subscription
+
+---
+
+## Seed Data Supporting Each Scenario
+
+The codebase includes realistic seed data for each scenario:
+
+### Scenario 1: Checkout Data
+
+| Data | Purpose |
+|------|---------|
+| Order 6: Promo code order | Shows value of saved payment methods |
+| Order 7: Power user rapid reorder | Shows express checkout opportunity |
+| Active Plus subscriber (Mike) | Demonstrates checkout for loyal customers |
+
+### Scenario 2: Phoenix Menu Data
+
+| Data | Purpose |
+|------|---------|
+| Order 4: Cancelled (item unavailable) | First cancellation pattern |
+| Order 8: Cancelled (multiple items unavailable) | Merchant cancelled |
+| Order 9: Delivered with substitution | Substitution flow |
+| Order 10: Cancelled (no substitute offered) | Third cancellation |
+| Phoenix restaurant: 3.8 rating | Lower due to menu issues |
+| Carlos (Phoenix): Paused Plus subscription | Menu frustration → churn |
+| Review: "This happens a lot at this restaurant" | Customer voice |
+
+### Scenario 3: ETA/Delivery Data
+
+| Data | Purpose |
+|------|---------|
+| Order 5: Miami late (25 min delay) | Dasher wait time |
+| Order 11: Miami severely late (35 min over) | Worst case |
+| Order 13: Miami moderate delay (15 min over) | Pattern |
+| Order 12: SF on-time (2 min early) | Market contrast |
+| Order 14: SF early (8 min early) | Plus member experience |
+| Ana (Miami): Cancelled Plus "NOT_ENOUGH_VALUE" | Delivery → churn |
+| 3 Miami reviews with LATE_DELIVERY issue | Customer voice pattern |
+| 3 SF reviews with 5-star delivery ratings | Market contrast |
+
+### Cross-Scenario Data
+
+| Data | Connection |
+|------|------------|
+| Ana cancelled Plus citing delivery issues | Scenario 3 → Plus retention |
+| Carlos paused Plus after menu cancellations | Scenario 2 → Plus retention |
+| Mike (SF) active Plus, happy reviews | Healthy baseline for contrast |
+
+---
+
+## Validating Spark Responses
+
+### What Good Looks Like
+
+**Cross-System Synthesis:**
+- Spark cites specific Productboard feedback themes
+- Spark references exact Amplitude event names and metrics
+- Spark finds and quotes relevant ADRs or code files
+- Spark produces a structured PRD with success metrics
+
+**Market-Aware Analysis:**
+- Spark correctly identifies Phoenix menu issues
+- Spark correctly identifies Miami delivery issues
+- Spark uses SF as the healthy baseline
+
+**Actionable Output:**
+- PRD includes phased implementation approach
+- Technical approach references actual codebase patterns
+- Success metrics are specific and measurable
+
+### Red Flags
+
+- Generic recommendations not tied to discovered constraints
+- Missing Amplitude event names or wrong metrics
+- Not finding the ADRs when asked about technical constraints
+- PRD that could apply to any food delivery app (not Dashly-specific)
